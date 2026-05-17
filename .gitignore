@@ -14,6 +14,10 @@ CMakeUserPresets.json
 build
 build-linux
 build-windows
+bin
+obj
+**/bin/
+**/obj/
 
 *.exe
 

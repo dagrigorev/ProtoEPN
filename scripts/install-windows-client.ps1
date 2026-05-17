@@ -15,7 +15,7 @@ if ($Version -eq "latest") {
     $Version = Get-LatestTag
 }
 
-$asset = "epn-windows-x86_64-$Version.zip"
+$asset = "epn-windows-gui-x86_64-$Version.zip"
 $url = "https://github.com/$Repo/releases/download/$Version/$asset"
 $zip = Join-Path $env:TEMP $asset
 
@@ -24,14 +24,14 @@ Write-Host "Downloading $url"
 Invoke-WebRequest -Uri $url -OutFile $zip
 
 Expand-Archive -Path $zip -DestinationPath $InstallDir -Force
-$exe = Get-ChildItem -Path $InstallDir -Filter epn-win-client.exe -Recurse | Select-Object -First 1
+$exe = Get-ChildItem -Path $InstallDir -Filter epn-windows-gui.exe -Recurse | Select-Object -First 1
 if (-not $exe) {
-    throw "epn-win-client.exe was not found after extraction"
+    throw "epn-windows-gui.exe was not found after extraction"
 }
 
 Write-Host ""
 Write-Host "EPN Windows client installed:"
 Write-Host "  $($exe.FullName)"
 Write-Host ""
-Write-Host "Example:"
-Write-Host "  `"$($exe.FullName)`" sysproxy --disc-host YOUR_SERVER_IP --disc-port 8000"
+Write-Host "Run it and enter an endpoint URL, for example:"
+Write-Host "  epn://YOUR_SERVER_IP:8000"

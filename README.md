@@ -90,13 +90,18 @@ git tag v0.1.0
 git push origin main v0.1.0
 ```
 
-GitHub Actions publishes Linux server binaries and the Windows client archive.
+GitHub Actions publishes Linux server binaries, the Windows CLI archive, and a
+minimal Windows GUI archive.
 
 Windows users can install the released client with PowerShell:
 
 ```powershell
 iwr https://raw.githubusercontent.com/dagrigorev/ProtoEPN/main/scripts/install-windows-client.ps1 -UseB | iex
 ```
+
+The GUI client accepts endpoint URLs such as `epn://139.60.163.250:8000`,
+starts the EPN SOCKS tunnel, enables the Windows system proxy, shows connection
+status and timeout state, and minimizes to the tray when closed.
 
 ---
 

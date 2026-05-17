@@ -1,0 +1,11 @@
+<Application x:Class="Epn.WindowsGui.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <SolidColorBrush x:Key="AccentBrush" Color="#2563EB"/>
+        <SolidColorBrush x:Key="GoodBrush" Color="#16A34A"/>
+        <SolidColorBrush x:Key="BadBrush" Color="#DC2626"/>
+        <SolidColorBrush x:Key="MutedBrush" Color="#64748B"/>
+    </Application.Resources>
+</Application>
