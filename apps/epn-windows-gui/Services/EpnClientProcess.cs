@@ -20,7 +20,6 @@ public sealed class EpnClientProcess
 
         var exe = ResolveClientExe();
 
-        var readyFromLog = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var failed = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         OutputReceived?.Invoke($"[GUI] Launching: {exe}");
@@ -41,8 +40,8 @@ public sealed class EpnClientProcess
             EnableRaisingEvents = true
         };
 
-        process.OutputDataReceived += (_, e) => HandleLine(e.Data, readyFromLog, failed);
-        process.ErrorDataReceived += (_, e) => HandleLine(e.Data, readyFromLog, failed);
+        process.OutputDataReceived += (_, e) => HandleLine(e.Data, failed);
+        process.ErrorDataReceived += (_, e) => HandleLine(e.Data, failed);
 
         process.Exited += (_, _) =>
         {
@@ -63,10 +62,7 @@ public sealed class EpnClientProcess
                 exitCode = -1;
             }
 
-            if (!readyFromLog.Task.IsCompleted)
-            {
-                failed.TrySetResult($"EPN client exited before SOCKS was ready. Exit code: {exitCode}.");
-            }
+            failed.TrySetResult($"EPN client exited before SOCKS was ready. Exit code: {exitCode}.");
 
             Exited?.Invoke(exitCode);
         };
@@ -86,10 +82,7 @@ public sealed class EpnClientProcess
 
         var readyFromPort = WaitForTcpPortAsync("127.0.0.1", socksPort, cancellationToken);
 
-        var completed = await Task.WhenAny(
-            readyFromLog.Task,
-            readyFromPort,
-            failed.Task);
+        var completed = await Task.WhenAny(readyFromPort, failed.Task);
 
         if (completed == failed.Task)
         {
@@ -214,10 +207,7 @@ public sealed class EpnClientProcess
             cancellationToken);
     }
 
-    private void HandleLine(
-    string? line,
-    TaskCompletionSource ready,
-    TaskCompletionSource<string> failed)
+    private void HandleLine(string? line, TaskCompletionSource<string> failed)
     {
         if (string.IsNullOrWhiteSpace(line))
         {
@@ -225,14 +215,6 @@ public sealed class EpnClientProcess
         }
 
         OutputReceived?.Invoke(line);
-
-        if (line.Contains("SOCKS5 proxy running", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("EpnTunnel: established", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Tunnel: established", StringComparison.OrdinalIgnoreCase))
-        {
-            ready.TrySetResult();
-            return;
-        }
 
         if (line.Contains("[FAIL]", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Cannot establish", StringComparison.OrdinalIgnoreCase) ||

@@ -8,6 +8,28 @@ public static class SocksProbe
 {
     public static async Task VerifyHttpAsync(int socksPort, CancellationToken cancellationToken)
     {
+        Exception? lastError = null;
+
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            try
+            {
+                await TryVerifyHttpAsync(socksPort, cancellationToken);
+                return;
+            }
+            catch (Exception ex) when (ex is SocketException or IOException)
+            {
+                lastError = ex;
+                await Task.Delay(250, cancellationToken);
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"SOCKS5 probe failed after retries. Last error: {lastError?.Message}");
+    }
+
+    private static async Task TryVerifyHttpAsync(int socksPort, CancellationToken cancellationToken)
+    {
         using var tcp = new TcpClient();
         await tcp.ConnectAsync("127.0.0.1", socksPort, cancellationToken);
         await using var stream = tcp.GetStream();
