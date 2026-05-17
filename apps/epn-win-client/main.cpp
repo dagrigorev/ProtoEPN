@@ -767,7 +767,7 @@ int main(int argc, char** argv) {
         // Set system proxy
         if (win_proxy::enable("127.0.0.1", static_cast<uint16_t>(socks_port))) {
             win_con::Colored c(win_con::GREEN);
-            std::cout << "\n[EPN] System proxy set: socks=127.0.0.1:" << socks_port << "\n";
+            std::cout << "\n[EPN] System proxy PAC set: SOCKS5 127.0.0.1:" << socks_port << "\n";
             std::cout << "[EPN] All applications that respect system proxy are now tunneled.\n";
         } else {
             win_con::Colored c(win_con::YELLOW);

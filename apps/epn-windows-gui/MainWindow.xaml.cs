@@ -90,7 +90,15 @@ public partial class MainWindow : Window
                 return;
             }
 
-            SystemProxy.EnableSocks("127.0.0.1", socksPort);
+            SetConnecting("Testing tunneled web access...");
+            await SocksProbe.VerifyHttpAsync(socksPort, token);
+
+            if (token.IsCancellationRequested || generation != connectionGeneration)
+            {
+                return;
+            }
+
+            SystemProxy.EnablePac("127.0.0.1", socksPort, allowDirectFallback: false);
 
             if (token.IsCancellationRequested || generation != connectionGeneration)
             {
@@ -98,7 +106,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            SetConnected($"System proxy: socks=127.0.0.1:{socksPort}");
+            SetConnected($"System proxy: PAC → SOCKS5 127.0.0.1:{socksPort}");
             trayIcon.Text = "EPN connected";
             trayIcon.ShowBalloonTip(1500, "EPN", "Connected", Forms.ToolTipIcon.Info);
         }

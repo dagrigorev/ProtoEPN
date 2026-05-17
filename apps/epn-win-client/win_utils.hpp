@@ -19,6 +19,7 @@
 #include <shellapi.h>
 
 #include <cstdint>
+#include <fstream>
 #include <functional>
 #include <string>
 #include <memory>
@@ -39,22 +40,59 @@ namespace win_proxy {
 constexpr LPCSTR REG_KEY =
     "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
 
+inline std::string pac_path() {
+    char local[MAX_PATH] = {};
+    DWORD n = GetEnvironmentVariableA("LOCALAPPDATA", local, MAX_PATH);
+    std::string base = (n > 0 && n < MAX_PATH) ? std::string(local) : ".";
+    std::string dir = base + "\\EPN";
+    CreateDirectoryA(dir.c_str(), nullptr);
+    return dir + "\\epn-proxy.pac";
+}
+
+inline std::string file_url(const std::string& path) {
+    std::string out = "file:///";
+    for (char ch : path) {
+        if (ch == '\\') out.push_back('/');
+        else if (ch == ' ') out += "%20";
+        else out.push_back(ch);
+    }
+    return out;
+}
+
+inline bool write_pac(const std::string& host, uint16_t port) {
+    std::ofstream f(pac_path(), std::ios::binary | std::ios::trunc);
+    if (!f) return false;
+    f << "function FindProxyForURL(url, host) {\n"
+      << "  if (isPlainHostName(host) || dnsDomainIs(host, \".local\") ||\n"
+      << "      shExpMatch(host, \"localhost\") || shExpMatch(host, \"127.*\") ||\n"
+      << "      shExpMatch(host, \"10.*\") || shExpMatch(host, \"192.168.*\") ||\n"
+      << "      shExpMatch(host, \"172.16.*\") || shExpMatch(host, \"172.17.*\") ||\n"
+      << "      shExpMatch(host, \"172.18.*\") || shExpMatch(host, \"172.19.*\") ||\n"
+      << "      shExpMatch(host, \"172.20.*\") || shExpMatch(host, \"172.21.*\") ||\n"
+      << "      shExpMatch(host, \"172.22.*\") || shExpMatch(host, \"172.23.*\") ||\n"
+      << "      shExpMatch(host, \"172.24.*\") || shExpMatch(host, \"172.25.*\") ||\n"
+      << "      shExpMatch(host, \"172.26.*\") || shExpMatch(host, \"172.27.*\") ||\n"
+      << "      shExpMatch(host, \"172.28.*\") || shExpMatch(host, \"172.29.*\") ||\n"
+      << "      shExpMatch(host, \"172.30.*\") || shExpMatch(host, \"172.31.*\")) return \"DIRECT\";\n"
+      << "  return \"SOCKS5 " << host << ":" << port << "\";\n"
+      << "}\n";
+    return true;
+}
+
 inline bool enable(const std::string& host, uint16_t port) {
+    if (!write_pac(host, port)) return false;
     HKEY key;
     if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_SET_VALUE, &key) != ERROR_SUCCESS)
         return false;
-    std::string proxy = "socks=" + host + ":" + std::to_string(port);
-    constexpr LPCSTR overrides =
-        "localhost;127.*;10.*;172.16.*;192.168.*;<local>";
-    DWORD enabled = 1;
-    RegSetValueExA(key, "ProxyServer",   0, REG_SZ,
-        reinterpret_cast<const BYTE*>(proxy.c_str()),
-        static_cast<DWORD>(proxy.size() + 1));
+    DWORD enabled = 0;
     RegSetValueExA(key, "ProxyEnable",   0, REG_DWORD,
         reinterpret_cast<const BYTE*>(&enabled), sizeof(DWORD));
-    RegSetValueExA(key, "ProxyOverride", 0, REG_SZ,
-        reinterpret_cast<const BYTE*>(overrides),
-        static_cast<DWORD>(strlen(overrides) + 1));
+    RegDeleteValueA(key, "ProxyServer");
+    RegDeleteValueA(key, "ProxyOverride");
+    std::string pac = file_url(pac_path());
+    RegSetValueExA(key, "AutoConfigURL", 0, REG_SZ,
+        reinterpret_cast<const BYTE*>(pac.c_str()),
+        static_cast<DWORD>(pac.size() + 1));
     RegCloseKey(key);
     DWORD_PTR result = 0;
     SendMessageTimeoutA(HWND_BROADCAST, WM_SETTINGCHANGE, 0,
@@ -71,7 +109,10 @@ inline bool disable() {
     RegSetValueExA(key, "ProxyEnable", 0, REG_DWORD,
         reinterpret_cast<const BYTE*>(&disabled), sizeof(DWORD));
     RegDeleteValueA(key, "ProxyServer");
+    RegDeleteValueA(key, "ProxyOverride");
+    RegDeleteValueA(key, "AutoConfigURL");
     RegCloseKey(key);
+    DeleteFileA(pac_path().c_str());
     DWORD_PTR result = 0;
     SendMessageTimeoutA(HWND_BROADCAST, WM_SETTINGCHANGE, 0,
         reinterpret_cast<LPARAM>("Internet Settings"),
@@ -84,14 +125,19 @@ inline std::string current() {
     if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
         return "(registry error)";
     char buf[512] = {};
+    char pac[512] = {};
     DWORD len = sizeof(buf), type = 0;
+    DWORD pac_len = sizeof(pac), pac_type = 0;
     DWORD enabled = 0, elen = sizeof(DWORD), etype = REG_DWORD;
     RegQueryValueExA(key, "ProxyEnable", nullptr, &etype,
         reinterpret_cast<LPBYTE>(&enabled), &elen);
     RegQueryValueExA(key, "ProxyServer", nullptr, &type,
         reinterpret_cast<LPBYTE>(buf), &len);
+    RegQueryValueExA(key, "AutoConfigURL", nullptr, &pac_type,
+        reinterpret_cast<LPBYTE>(pac), &pac_len);
     RegCloseKey(key);
     if (enabled && buf[0]) return std::string("ENABLED — ") + buf;
+    if (pac[0]) return std::string("PAC — ") + pac;
     return "DISABLED";
 }
 
