@@ -10,16 +10,19 @@ namespace Epn.WindowsGui;
 public partial class MainWindow : Window
 {
     private readonly EpnClientProcess client = new();
+    private readonly InstanceCoordinator instances;
     private readonly Forms.NotifyIcon trayIcon;
     private bool exitRequested;
+    private bool closeInsteadOfTray;
 
     private CancellationTokenSource? connectCts;
     private int connectionGeneration;
     private bool disconnectInProgress;
 
-    public MainWindow()
+    public MainWindow(InstanceCoordinator instances)
     {
         InitializeComponent();
+        this.instances = instances;
 
         trayIcon = new Forms.NotifyIcon
         {
@@ -32,6 +35,7 @@ public partial class MainWindow : Window
 
         client.OutputReceived += line => Dispatcher.Invoke(() => ObserveClientOutput(line));
         client.Exited += code => Dispatcher.Invoke(() => OnClientExited(code));
+        instances.ShutdownRequested += () => Dispatcher.Invoke(async () => await CloseFromNewerInstanceAsync());
 
         LoadSettings();
         SetDisconnected("Ready.");
@@ -220,6 +224,16 @@ public partial class MainWindow : Window
             : $"EPN process exited with code {code}.");
     }
 
+    private async Task CloseFromNewerInstanceAsync()
+    {
+        closeInsteadOfTray = true;
+        exitRequested = true;
+        await DisconnectAsync();
+        trayIcon.Visible = false;
+        trayIcon.Dispose();
+        Close();
+    }
+
     private async Task RunCleanupAsync()
     {
         try
@@ -278,8 +292,14 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (exitRequested)
+        if (exitRequested || closeInsteadOfTray)
         {
+            return;
+        }
+
+        if (!instances.IsLatestOwner)
+        {
+            closeInsteadOfTray = true;
             return;
         }
 
