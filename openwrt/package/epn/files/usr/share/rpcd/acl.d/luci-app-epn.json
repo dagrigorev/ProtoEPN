@@ -1,0 +1,17 @@
+{
+  "luci-app-epn": {
+    "description": "Grant access to EPN configuration and diagnostics",
+    "read": {
+      "uci": [ "epn" ],
+      "ubus": {
+        "file": [ "exec" ]
+      }
+    },
+    "write": {
+      "uci": [ "epn" ],
+      "ubus": {
+        "file": [ "exec" ]
+      }
+    }
+  }
+}

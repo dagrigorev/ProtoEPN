@@ -1,0 +1,25 @@
+#!/bin/sh
+
+ENABLED="$(uci -q get epn.main.enabled || echo 0)"
+HOST="$(uci -q get epn.main.disc_host)"
+PORT="$(uci -q get epn.main.disc_port)"
+SOCKS_BIND="$(uci -q get epn.main.socks_bind)"
+SOCKS_PORT="$(uci -q get epn.main.socks_port)"
+
+if /etc/init.d/epn running >/dev/null 2>&1; then
+	RUNNING=true
+else
+	RUNNING=false
+fi
+
+if nc -z -w 1 127.0.0.1 "$SOCKS_PORT" >/dev/null 2>&1; then
+	SOCKS_READY=true
+else
+	SOCKS_READY=false
+fi
+
+printf '{"enabled":%s,"running":%s,"socks_ready":%s,"discovery":"%s:%s","socks":"%s:%s"}\n' \
+	"$([ "$ENABLED" = "1" ] && echo true || echo false)" \
+	"$RUNNING" \
+	"$SOCKS_READY" \
+	"$HOST" "$PORT" "$SOCKS_BIND" "$SOCKS_PORT"

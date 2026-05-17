@@ -103,6 +103,14 @@ The GUI client accepts endpoint URLs such as `epn://139.60.163.250:8000`,
 starts the EPN SOCKS tunnel, enables the Windows system proxy, shows connection
 status and timeout state, and minimizes to the tray when closed.
 
+## OpenWrt Client
+
+The repository includes an OpenWrt package feed under `openwrt/package/epn`
+for router-side client builds, including a procd service, UCI config, and a
+minimal LuCI page with discovery endpoint ping. Build it with the OpenWrt SDK
+matching your router target, for example `aarch64_cortex-a53`. See
+`openwrt/README.md` for SDK commands and install steps.
+
 ---
 
 ## Usage — Mode 1: SOCKS5 Proxy (no root required)

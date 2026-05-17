@@ -1,0 +1,13 @@
+{
+  "admin/services/epn": {
+    "title": "EPN",
+    "order": 65,
+    "action": {
+      "type": "view",
+      "path": "epn/client"
+    },
+    "depends": {
+      "acl": [ "luci-app-epn" ]
+    }
+  }
+}

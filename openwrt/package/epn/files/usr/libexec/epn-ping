@@ -1,0 +1,25 @@
+#!/bin/sh
+
+HOST="${1:-$(uci -q get epn.main.disc_host)}"
+PORT="${2:-$(uci -q get epn.main.disc_port)}"
+TIMEOUT="${3:-3}"
+
+json_escape() {
+	printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+if [ -z "$HOST" ] || [ -z "$PORT" ]; then
+	printf '{"ok":false,"message":"Discovery host or port is not configured"}\n'
+	exit 1
+fi
+
+START="$(date +%s 2>/dev/null || echo 0)"
+if nc -z -w "$TIMEOUT" "$HOST" "$PORT" >/dev/null 2>&1; then
+	END="$(date +%s 2>/dev/null || echo "$START")"
+	ELAPSED=$((END - START))
+	printf '{"ok":true,"host":"%s","port":%s,"elapsed_seconds":%s,"message":"Discovery endpoint is reachable"}\n' "$(json_escape "$HOST")" "$PORT" "$ELAPSED"
+	exit 0
+fi
+
+printf '{"ok":false,"host":"%s","port":%s,"message":"Discovery endpoint is not reachable"}\n' "$(json_escape "$HOST")" "$PORT"
+exit 1
