@@ -1,92 +1,99 @@
+using System.Diagnostics;
+using System.IO;
+using System.Text.Json;
+
 namespace Epn.WindowsGui.Services;
 
 public sealed class InstanceCoordinator : IDisposable
 {
-    private const string MutexName = @"Local\EPN.WindowsGui.ActiveOwner";
-    private const string ShutdownEventName = @"Local\EPN.WindowsGui.ShutdownPrevious";
+    private static readonly string StateDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "EPN",
+        "instances");
+    private static readonly string LatestPath = Path.Combine(StateDir, "latest.json");
 
-    private readonly EventWaitHandle shutdownEvent;
-    private readonly CancellationTokenSource cts = new();
-    private Mutex? ownerMutex;
-    private Task? watcher;
+    private readonly int currentPid = Environment.ProcessId;
+    private readonly string currentToken = Guid.NewGuid().ToString("N");
 
-    public event Action? ShutdownRequested;
-
-    public bool IsLatestOwner { get; private set; }
-
-    public InstanceCoordinator()
-    {
-        shutdownEvent = new EventWaitHandle(
-            initialState: false,
-            mode: EventResetMode.AutoReset,
-            name: ShutdownEventName);
-    }
+    public bool IsLatestOwner => ReadLatest()?.Pid == currentPid &&
+                                 ReadLatest()?.Token == currentToken;
 
     public async Task BecomeLatestAsync()
     {
-        shutdownEvent.Set();
-        await Task.Delay(700, cts.Token);
-        AcquireOwnerMutex();
-        watcher = Task.Run(WatchShutdownRequestsAsync);
-    }
+        Directory.CreateDirectory(StateDir);
+        var previous = ReadLatest();
+        WriteLatest(new InstanceState(currentPid, currentToken));
 
-    private void AcquireOwnerMutex()
-    {
-        ownerMutex?.Dispose();
-        ownerMutex = new Mutex(initiallyOwned: true, name: MutexName, out var createdNew);
-        if (!createdNew)
+        if (previous is not null && previous.Pid != currentPid)
         {
-            try
-            {
-                IsLatestOwner = ownerMutex.WaitOne(TimeSpan.Zero);
-            }
-            catch (AbandonedMutexException)
-            {
-                IsLatestOwner = true;
-            }
-        }
-        else
-        {
-            IsLatestOwner = true;
+            await ClosePreviousAsync(previous.Pid);
         }
     }
 
-    private void WatchShutdownRequestsAsync()
+    private static async Task ClosePreviousAsync(int pid)
     {
-        while (!cts.IsCancellationRequested)
+        Process? process = null;
+
+        try
         {
-            if (!shutdownEvent.WaitOne(500))
+            process = Process.GetProcessById(pid);
+            if (process.ProcessName.Equals("epn-windows-gui", StringComparison.OrdinalIgnoreCase))
             {
-                continue;
-            }
+                process.CloseMainWindow();
+                for (var i = 0; i < 20 && !process.HasExited; i++)
+                {
+                    await Task.Delay(100);
+                    process.Refresh();
+                }
 
-            if (!IsLatestOwner)
-            {
-                continue;
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    await process.WaitForExitAsync();
+                }
             }
-
-            IsLatestOwner = false;
-            ShutdownRequested?.Invoke();
-            return;
+        }
+        catch
+        {
+            // The previous process may already be gone.
+        }
+        finally
+        {
+            process?.Dispose();
         }
     }
 
     public void Dispose()
     {
-        cts.Cancel();
+        if (IsLatestOwner)
+        {
+            TryDeleteLatest();
+        }
+    }
+
+    private static InstanceState? ReadLatest()
+    {
         try
         {
-            if (IsLatestOwner)
-            {
-                ownerMutex?.ReleaseMutex();
-            }
+            return File.Exists(LatestPath)
+                ? JsonSerializer.Deserialize<InstanceState>(File.ReadAllText(LatestPath))
+                : null;
         }
         catch
         {
-            // Mutex may already be abandoned during process shutdown.
+            return null;
         }
-        ownerMutex?.Dispose();
-        shutdownEvent.Dispose();
-        cts.Dispose();
     }
+
+    private static void WriteLatest(InstanceState state)
+    {
+        File.WriteAllText(LatestPath, JsonSerializer.Serialize(state));
+    }
+
+    private static void TryDeleteLatest()
+    {
+        try { File.Delete(LatestPath); } catch { }
+    }
+
+    private sealed record InstanceState(int Pid, string Token);
 }

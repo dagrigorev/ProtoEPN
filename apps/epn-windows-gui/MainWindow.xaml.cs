@@ -35,7 +35,6 @@ public partial class MainWindow : Window
 
         client.OutputReceived += line => Dispatcher.Invoke(() => ObserveClientOutput(line));
         client.Exited += code => Dispatcher.Invoke(() => OnClientExited(code));
-        instances.ShutdownRequested += () => Dispatcher.Invoke(async () => await CloseFromNewerInstanceAsync());
 
         LoadSettings();
         SetDisconnected("Ready.");
@@ -224,16 +223,6 @@ public partial class MainWindow : Window
             : $"EPN process exited with code {code}.");
     }
 
-    private async Task CloseFromNewerInstanceAsync()
-    {
-        closeInsteadOfTray = true;
-        exitRequested = true;
-        await DisconnectAsync();
-        trayIcon.Visible = false;
-        trayIcon.Dispose();
-        Close();
-    }
-
     private async Task RunCleanupAsync()
     {
         try
@@ -300,6 +289,7 @@ public partial class MainWindow : Window
         if (!instances.IsLatestOwner)
         {
             closeInsteadOfTray = true;
+            exitRequested = true;
             return;
         }
 
