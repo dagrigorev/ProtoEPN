@@ -104,6 +104,17 @@ build_from_source() {
   install -m 0755 "${src}/scripts/"*.sh "${EPN_HOME}/scripts/" || true
 }
 
+validate_installed_binaries() {
+  local bins=(epn-discovery epn-relay epn-tun-server)
+  local bin
+  for bin in "${bins[@]}"; do
+    if ! "${EPN_HOME}/bin/${bin}" --help >/dev/null 2>&1; then
+      echo "Installed ${bin} cannot run on this host." >&2
+      return 1
+    fi
+  done
+}
+
 write_service() {
   local name="$1"
   local exec_line="$2"
@@ -163,6 +174,33 @@ configure_systemd() {
   systemctl enable --now epn-tun-server
 }
 
+check_services() {
+  local services=(epn-discovery)
+  local idx=1
+  for _port in ${EPN_RELAY_PORTS}; do
+    services+=("epn-relay-${idx}")
+    idx=$((idx + 1))
+  done
+  services+=(epn-tun-server)
+
+  sleep 3
+  local failed=()
+  for service in "${services[@]}"; do
+    if ! systemctl is-active --quiet "${service}"; then
+      failed+=("${service}")
+    fi
+  done
+
+  if [[ "${#failed[@]}" -gt 0 ]]; then
+    echo "EPN service startup failed: ${failed[*]}" >&2
+    echo "" >&2
+    systemctl status "${failed[@]}" --no-pager >&2 || true
+    echo "" >&2
+    journalctl -u "${failed[@]}" -n 80 --no-pager >&2 || true
+    exit 1
+  fi
+}
+
 print_summary() {
   local host="$1"
   local tag="$2"
@@ -215,8 +253,8 @@ main() {
   if [[ "${EPN_BUILD_FROM_SOURCE}" == "1" || "${tag}" == "main" ]]; then
     build_from_source "${tag}"
   else
-    if ! download_release "${tag}"; then
-      echo "Release asset download failed; building from source instead."
+    if ! download_release "${tag}" || ! validate_installed_binaries; then
+      echo "Release asset is unavailable or incompatible with this host; building from source instead."
       build_from_source "${tag}"
     fi
   fi
@@ -224,6 +262,7 @@ main() {
   local host
   host="$(public_host)"
   configure_systemd "${host}"
+  check_services
   print_summary "${host}" "${tag}"
 }
 
