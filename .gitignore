@@ -19,6 +19,7 @@ obj
 **/bin/
 **/obj/
 .vs/
+dist
 
 *.exe
 

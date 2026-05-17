@@ -76,8 +76,8 @@ endef
 define Package/luci-app-epn/install
 	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d
 	$(INSTALL_DATA) ./files/usr/share/luci/menu.d/luci-app-epn.json $(1)/usr/share/luci/menu.d/luci-app-epn.json
-	$(INSTALL_DIR) $(1)/usr/share/luci/htdocs/luci-static/resources/view/epn
-	$(INSTALL_DATA) ./files/usr/share/luci/htdocs/luci-static/resources/view/epn/client.js $(1)/usr/share/luci/htdocs/luci-static/resources/view/epn/client.js
+	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/epn
+	$(INSTALL_DATA) ./files/usr/share/luci/htdocs/luci-static/resources/view/epn/client.js $(1)/www/luci-static/resources/view/epn/client.js
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/luci-app-epn.json $(1)/usr/share/rpcd/acl.d/luci-app-epn.json
 endef
