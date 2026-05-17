@@ -90,8 +90,16 @@ git tag v0.1.0
 git push origin main v0.1.0
 ```
 
-GitHub Actions publishes Linux server binaries, the Windows CLI archive, and a
-minimal Windows GUI archive.
+GitHub Actions publishes server and client artifacts for the supported release
+targets: Linux, Windows, and OpenWrt.
+
+Release assets are split by platform and role:
+
+- `epn-server-linux-x86_64-<tag>.tar.gz`
+- `epn-client-linux-x86_64-<tag>.tar.gz`
+- `epn-windows-x86_64-<tag>.zip`
+- `epn-windows-gui-x86_64-<tag>.zip`
+- `epn-openwrt-aarch64_cortex-a53-<tag>.tar.gz`
 
 Windows users can install the released client with PowerShell:
 

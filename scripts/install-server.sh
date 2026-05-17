@@ -72,7 +72,7 @@ latest_tag() {
 
 download_release() {
   local tag="$1"
-  local asset="epn-linux-x86_64-${tag}.tar.gz"
+  local asset="epn-server-linux-x86_64-${tag}.tar.gz"
   local url="https://github.com/${EPN_REPO}/releases/download/${tag}/${asset}"
 
   mkdir -p "${EPN_HOME}"
@@ -80,9 +80,9 @@ download_release() {
   curl -fL "${url}" -o "/tmp/${asset}"
   tar -xzf "/tmp/${asset}" -C /tmp
   install -d "${EPN_HOME}/bin" "${EPN_HOME}/scripts"
-  install -m 0755 /tmp/epn-linux-x86_64/bin/* "${EPN_HOME}/bin/"
-  if [[ -d /tmp/epn-linux-x86_64/scripts ]]; then
-    install -m 0755 /tmp/epn-linux-x86_64/scripts/* "${EPN_HOME}/scripts/" || true
+  install -m 0755 /tmp/epn-server-linux-x86_64/bin/* "${EPN_HOME}/bin/"
+  if [[ -d /tmp/epn-server-linux-x86_64/scripts ]]; then
+    install -m 0755 /tmp/epn-server-linux-x86_64/scripts/* "${EPN_HOME}/scripts/" || true
   fi
 }
 
@@ -204,8 +204,12 @@ check_services() {
 print_summary() {
   local host="$1"
   local tag="$2"
-  local win_asset="epn-windows-x86_64-${tag}.zip"
+  local linux_client_asset="epn-client-linux-x86_64-${tag}.tar.gz"
+  local linux_client_url="https://github.com/${EPN_REPO}/releases/download/${tag}/${linux_client_asset}"
+  local win_asset="epn-windows-gui-x86_64-${tag}.zip"
   local win_url="https://github.com/${EPN_REPO}/releases/download/${tag}/${win_asset}"
+  local openwrt_asset="epn-openwrt-aarch64_cortex-a53-${tag}.tar.gz"
+  local openwrt_url="https://github.com/${EPN_REPO}/releases/download/${tag}/${openwrt_asset}"
 
   cat <<EOF
 
@@ -217,12 +221,17 @@ Public endpoint:
   Exit:      ${host}:${EPN_TUN_PORT}
 
 Linux client example:
+  Download: ${linux_client_url}
   epn-tun-client --disc-host ${host} --disc-port ${EPN_DISC_PORT} --socks-port 1080
   curl --socks5 127.0.0.1:1080 https://example.com
 
 Windows client:
   Download: ${win_url}
-  Run:      epn-win-client.exe sysproxy --disc-host ${host} --disc-port ${EPN_DISC_PORT}
+  Run:      epn-windows-gui.exe
+
+OpenWrt client:
+  Download: ${openwrt_url}
+  Configure discovery endpoint: ${host}:${EPN_DISC_PORT}
 
 Firewall ports to allow inbound TCP:
   ${EPN_DISC_PORT} ${EPN_RELAY_PORTS} ${EPN_TUN_PORT}
