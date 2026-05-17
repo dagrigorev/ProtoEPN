@@ -17,13 +17,21 @@ function(epn_set_compiler_options target)
       $<$<CONFIG:RelWithDebInfo>:-O2 -g -DNDEBUG>
     )
   else()
+    set(EPN_RELEASE_OPTIMIZATIONS
+      $<$<CONFIG:Release>:-O3>
+      $<$<CONFIG:Release>:-DNDEBUG>
+    )
+    if(NOT CMAKE_CROSSCOMPILING)
+      list(APPEND EPN_RELEASE_OPTIMIZATIONS $<$<CONFIG:Release>:-march=native>)
+    endif()
+
     target_compile_options(${target} PRIVATE
       -Wall -Wextra -Wpedantic
       -Wno-unused-parameter
       -Wconversion -Wshadow
       -fstack-protector-strong
       $<$<CONFIG:Debug>:-g -O0 -DEPN_DEBUG>
-      $<$<CONFIG:Release>:-O3 -DNDEBUG -march=native>
+      ${EPN_RELEASE_OPTIMIZATIONS}
       $<$<CONFIG:RelWithDebInfo>:-O2 -g -DNDEBUG>
     )
     # Security hardening

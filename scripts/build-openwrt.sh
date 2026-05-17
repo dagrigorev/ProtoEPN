@@ -62,10 +62,11 @@ sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=${PACKAGE_VERSION}/" "${SDK_DIR}/package
 
 (
   cd "${SDK_DIR}"
-  ./scripts/feeds update packages luci
-  ./scripts/feeds install libsodium luci-base rpcd-mod-file
+  ./scripts/feeds update packages
+  ./scripts/feeds install libsodium
   make defconfig
-  make package/epn/{clean,compile} EPN_SOURCE_DIR="${REPO_ROOT}" V=s
+  make package/epn/clean EPN_SOURCE_DIR="${REPO_ROOT}" V=s
+  make package/epn/compile EPN_SOURCE_DIR="${REPO_ROOT}" V=s
 )
 
 DIST_DIR="${REPO_ROOT}/dist/epn-openwrt-${OPENWRT_ARCH}"

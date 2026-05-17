@@ -4,12 +4,12 @@ PKG_NAME:=epn
 PKG_VERSION:=0.1.0
 PKG_RELEASE:=1
 
+ifeq ($(EPN_SOURCE_DIR),)
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/dagrigorev/ProtoEPN.git
 PKG_SOURCE_VERSION:=main
 PKG_MIRROR_HASH:=skip
-
-PKG_BUILD_DEPENDS:=cmake/host
+endif
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
@@ -32,7 +32,7 @@ define Package/luci-app-epn
   CATEGORY:=LuCI
   SUBMENU:=3. Applications
   TITLE:=LuCI support for EPN
-  DEPENDS:=+epn +luci-base +rpcd +rpcd-mod-file +busybox
+  DEPENDS:=+epn
   PKGARCH:=all
 endef
 
@@ -44,7 +44,7 @@ endef
 ifneq ($(EPN_SOURCE_DIR),)
 define Build/Prepare
 	$(RM) -r $(PKG_BUILD_DIR)
-	$(MKDIR) $(PKG_BUILD_DIR)
+	$(INSTALL_DIR) $(PKG_BUILD_DIR)
 	$(CP) $(EPN_SOURCE_DIR)/* $(PKG_BUILD_DIR)/
 endef
 endif
@@ -57,6 +57,9 @@ CMAKE_OPTIONS += \
 	-DEPN_BUILD_DEMO_APPS=OFF \
 	-DEPN_ENABLE_PQ_CRYPTO=OFF \
 	-DCMAKE_BUILD_TYPE=Release
+
+define Build/Install
+endef
 
 define Package/epn/install
 	$(INSTALL_DIR) $(1)/usr/bin

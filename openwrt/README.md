@@ -14,15 +14,17 @@ for the same OpenWrt release as the router firmware.
 cd openwrt-sdk-*
 mkdir -p package/epn
 cp -a /path/to/ProtoEPN/openwrt/package/epn/* package/epn/
-./scripts/feeds update packages luci
-./scripts/feeds install libsodium luci-base rpcd-mod-file
-make package/epn/{clean,compile} V=s
+./scripts/feeds update packages
+./scripts/feeds install libsodium
+make package/epn/clean V=s
+make package/epn/compile V=s
 ```
 
 For local development without cloning from GitHub during the SDK build:
 
 ```sh
-make package/epn/{clean,compile} EPN_SOURCE_DIR=/path/to/ProtoEPN V=s
+make package/epn/clean EPN_SOURCE_DIR=/path/to/ProtoEPN V=s
+make package/epn/compile EPN_SOURCE_DIR=/path/to/ProtoEPN V=s
 ```
 
 The resulting packages are written under `bin/packages/aarch64_cortex-a53/`.
@@ -30,6 +32,8 @@ The resulting packages are written under `bin/packages/aarch64_cortex-a53/`.
 ## Install on router
 
 ```sh
+opkg update
+opkg install luci-base rpcd rpcd-mod-file
 opkg install epn_*.ipk luci-app-epn_*.ipk
 /etc/init.d/rpcd restart
 /etc/init.d/uhttpd restart
