@@ -11,7 +11,7 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR/.."
-BUILD_DIR="$ROOT/build-windows"
+BUILD_DIR="${BUILD_DIR:-$ROOT/build-windows}"
 DEPS_DIR="$ROOT/.deps/windows"
 SODIUM_PREFIX="$DEPS_DIR/x86_64-w64-mingw32"
 SODIUM_VERSION="${SODIUM_VERSION:-1.0.20}"
@@ -99,6 +99,7 @@ if [[ -f "$EXE" ]]; then
     echo "  epn-win-client.exe sysproxy --disc-host <server> --disc-port 8000"
     echo "  epn-win-client.exe wintun   --disc-host <server> --disc-port 8000 --gateway <gw>"
     echo "  epn-win-client.exe status"
+    echo "  epn-win-client.exe cleanup"
 else
     echo -e "${RED}Build failed — check output above${NC}"
     exit 1

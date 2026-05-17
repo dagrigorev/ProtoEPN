@@ -12,6 +12,7 @@
 //   epn-win-client sysproxy --disc-host 1.2.3.4   --disc-port 8000
 //   epn-win-client wintun   --disc-host 1.2.3.4   --disc-port 8000
 //   epn-win-client status
+//   epn-win-client cleanup
 
 // ─── Windows headers (must come before Asio) ─────────────────────────────────
 #ifndef WIN32_LEAN_AND_MEAN
@@ -659,6 +660,11 @@ int main(int argc, char** argv) {
     auto* cmd_status = app.add_subcommand("status", "Show current proxy status");
     (void)cmd_status;
 
+    // ── cleanup subcommand ────────────────────────────────────────────────────
+    auto* cmd_cleanup = app.add_subcommand("cleanup", "Disable EPN system proxy and remove WinTun routes");
+    cmd_cleanup->add_option("--tun-ip",   tun_ip,    "TUN adapter IP")->default_val("10.99.0.1");
+    cmd_cleanup->add_option("--relay-ip", relay_ips, "Relay IP(s) to remove from bypass routes");
+
     CLI11_PARSE(app, argc, argv);
 
     observability::init_logger("epn-win", debug);
@@ -668,6 +674,22 @@ int main(int argc, char** argv) {
     if (app.got_subcommand("status")) {
         std::cout << "\nEPN Windows Client\n";
         std::cout << "System proxy: " << win_proxy::current() << "\n\n";
+        return 0;
+    }
+
+    // ── Cleanup ───────────────────────────────────────────────────────────────
+    if (app.got_subcommand("cleanup")) {
+        bool proxy_ok = win_proxy::disable();
+        bool route_ok = wintun::del_default_route(tun_ip);
+        for (auto& ip : relay_ips) {
+            wintun::del_bypass_route(ip);
+        }
+        bool adapter_ok = wintun::delete_adapter();
+
+        std::cout << "\nEPN cleanup\n";
+        std::cout << "  System proxy: " << (proxy_ok ? "disabled" : "not changed") << "\n";
+        std::cout << "  Default WinTun route: " << (route_ok ? "removed" : "not present") << "\n";
+        std::cout << "  WinTun adapter: " << (adapter_ok ? "deleted" : "not present") << "\n\n";
         return 0;
     }
 

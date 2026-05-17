@@ -109,6 +109,23 @@ epn-win-client.exe status
 
 ---
 
+### Cleanup
+
+Remove EPN system proxy settings and best-effort WinTun routes/adapters after a
+crash or forced process kill:
+
+```
+epn-win-client.exe cleanup
+```
+
+For WinTun bypass routes:
+
+```
+epn-win-client.exe cleanup --tun-ip 10.99.0.1 --relay-ip SERVER_IP
+```
+
+---
+
 ## Server-Side Setup
 
 The server infrastructure runs on Linux. Start in this order:

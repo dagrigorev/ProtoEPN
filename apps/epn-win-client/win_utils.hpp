@@ -70,6 +70,7 @@ inline bool disable() {
     DWORD disabled = 0;
     RegSetValueExA(key, "ProxyEnable", 0, REG_DWORD,
         reinterpret_cast<const BYTE*>(&disabled), sizeof(DWORD));
+    RegDeleteValueA(key, "ProxyServer");
     RegCloseKey(key);
     DWORD_PTR result = 0;
     SendMessageTimeoutA(HWND_BROADCAST, WM_SETTINGCHANGE, 0,
@@ -178,6 +179,18 @@ inline bool del_bypass_route(const std::string& ip) {
 }
 inline bool set_default_route(const std::string& tun_ip) {
     return system(("route add 0.0.0.0 mask 0.0.0.0 " + tun_ip + " metric 1").c_str()) == 0;
+}
+inline bool del_default_route(const std::string& tun_ip) {
+    return system(("route delete 0.0.0.0 mask 0.0.0.0 " + tun_ip).c_str()) == 0;
+}
+inline bool delete_adapter(const std::wstring& name = L"EPN0") {
+    auto& wt = api();
+    if (!wt.loaded && !wt.load()) return false;
+    auto adapter = wt.OpenAdapter(name.c_str());
+    if (!adapter) return false;
+    BOOL ok = wt.DeleteAdapter(adapter);
+    wt.CloseAdapter(adapter);
+    return ok == TRUE;
 }
 
 } // namespace wintun

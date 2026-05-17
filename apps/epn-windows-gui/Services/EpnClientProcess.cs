@@ -149,6 +149,38 @@ public sealed class EpnClientProcess
         }
     }
 
+    public async Task CleanupAsync(CancellationToken cancellationToken = default)
+    {
+        var exe = ResolveClientExe();
+        using var cleanup = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = exe,
+                Arguments = "cleanup",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                WorkingDirectory = Path.GetDirectoryName(exe)!
+            }
+        };
+
+        cleanup.Start();
+        var stdout = cleanup.StandardOutput.ReadToEndAsync(cancellationToken);
+        var stderr = cleanup.StandardError.ReadToEndAsync(cancellationToken);
+        await cleanup.WaitForExitAsync(cancellationToken);
+
+        foreach (var line in (await stdout).Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+        {
+            OutputReceived?.Invoke(line);
+        }
+        foreach (var line in (await stderr).Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+        {
+            OutputReceived?.Invoke(line);
+        }
+    }
+
     private static async Task WaitForTcpPortAsync(string host, int port, CancellationToken cancellationToken)
     {
         Exception? lastError = null;
@@ -204,8 +236,8 @@ public sealed class EpnClientProcess
 
         if (line.Contains("[FAIL]", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("Cannot establish", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("error", StringComparison.OrdinalIgnoreCase))
+            line.Contains("Failed to establish", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("EPN client exited before SOCKS was ready", StringComparison.OrdinalIgnoreCase))
         {
             failed.TrySetResult(line);
         }

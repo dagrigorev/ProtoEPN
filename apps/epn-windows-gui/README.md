@@ -10,7 +10,8 @@ Minimal WPF shell for `epn-win-client.exe`.
 4. Click **Connect**.
 
 The GUI starts `epn-win-client.exe socks`, waits until the tunnel is ready, and
-then enables the Windows system SOCKS proxy. **Disconnect** disables the proxy.
+then enables the Windows system SOCKS proxy. **Disconnect** stops the client and
+runs `epn-win-client.exe cleanup` to clear proxy/VPN leftovers.
 Closing the window hides it to the tray; use the tray menu to reopen, disconnect,
 or exit.
 

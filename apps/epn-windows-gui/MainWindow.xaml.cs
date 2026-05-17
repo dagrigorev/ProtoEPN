@@ -94,7 +94,7 @@ public partial class MainWindow : Window
 
             if (token.IsCancellationRequested || generation != connectionGeneration)
             {
-                SystemProxy.Disable();
+                await RunCleanupAsync();
                 return;
             }
 
@@ -135,8 +135,8 @@ public partial class MainWindow : Window
 
             connectCts?.Cancel();
 
-            SystemProxy.Disable();
             await client.StopAsync();
+            await RunCleanupAsync();
 
             SetDisconnected("Proxy disabled.");
             trayIcon.Text = "EPN disconnected";
@@ -206,10 +206,23 @@ public partial class MainWindow : Window
             return;
         }
 
-        SystemProxy.Disable();
+        _ = RunCleanupAsync();
         SetDisconnected(code == 0
             ? "EPN process stopped."
             : $"EPN process exited with code {code}.");
+    }
+
+    private async Task RunCleanupAsync()
+    {
+        try
+        {
+            await client.CleanupAsync();
+        }
+        catch (Exception ex)
+        {
+            SystemProxy.Disable();
+            DetailsText.Text = $"Cleanup fallback used: {ex.Message}";
+        }
     }
 
     private void SetConnecting(string details)
