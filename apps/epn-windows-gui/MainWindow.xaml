@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="EPN Client"
         Width="460"
-        Height="330"
+        Height="365"
         MinWidth="420"
         MinHeight="310"
         WindowStartupLocation="CenterScreen"
@@ -35,7 +35,7 @@
                      Height="34"
                      Margin="0,6,0,0"
                      VerticalContentAlignment="Center"
-                     Text="epn://139.60.163.250:8000"/>
+                     Text="epn://127.0.0.1:8000"/>
         </StackPanel>
 
         <Grid Grid.Row="4">
@@ -83,7 +83,7 @@
             </Grid>
         </Border>
 
-        <DockPanel Grid.Row="7" LastChildFill="False">
+        <DockPanel Grid.Row="7" LastChildFill="False" Margin="0,5,0,-5">
             <TextBlock DockPanel.Dock="Left"
                        VerticalAlignment="Center"
                        Foreground="{StaticResource MutedBrush}"
