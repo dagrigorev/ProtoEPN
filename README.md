@@ -212,7 +212,7 @@ Stream IDs are odd (client-initiated), starting at 1 and incrementing by 2 per n
 
 ```bash
 cd build
-./tests/epn-tests          # 33/33 unit tests
+./tests/epn-tests          # unit tests
 ctest --output-on-failure  # same via CTest
 ```
 
@@ -221,7 +221,7 @@ ctest --output-on-failure  # same via CTest
 | CryptoTest | 15 | X25519, HKDF, AEAD, Ed25519, nonce monotonicity, zeroization |
 | ProtocolTest | 6 | Frame encode/decode, truncation, peek |
 | OnionTest | 5 | 1-hop + 3-hop peel, wrong-key rejection, anti-replay |
-| DiscoveryTest | 7 | Registry CRUD, sig rejection, expiry, JSON round-trip |
+| DiscoveryTest | 8 | Registry CRUD, sig/node-id rejection, expiry, JSON round-trip |
 
 ---
 

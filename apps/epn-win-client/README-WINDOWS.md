@@ -59,10 +59,11 @@ Bypassed (always direct):
 
 ---
 
-### Mode 3 — WinTun Full VPN (requires Administrator + wintun.dll)
+### Mode 3 — WinTun Experimental Adapter (requires Administrator + wintun.dll)
 
-Creates a virtual TUN network adapter. **All TCP traffic is transparently tunneled**
-through EPN — no per-application configuration at all.
+Creates a virtual TUN network adapter, but the packet-level TCP handling is not
+production-complete yet. Use `socks` or `sysproxy` mode for functional Windows
+tunneling today.
 
 **Setup:**
 
@@ -88,10 +89,10 @@ To find your gateway:
 ipconfig | findstr "Default Gateway"
 ```
 
-What gets tunneled in WinTun mode:
-- ✅ **All TCP traffic** from all applications — no configuration needed
-- ❌ UDP is NOT tunneled (DNS, QUIC, etc.)
-- ❌ ICMP (ping) is NOT tunneled
+WinTun status:
+- Adapter/routing setup is present
+- Full TCP stream synthesis and packet forwarding are still incomplete
+- UDP, DNS, QUIC, and ICMP are not tunneled
 
 DNS leak prevention: set a custom DNS server (e.g. `1.1.1.1`) to prevent DNS leaks
 via your ISP's resolver while using WinTun mode.

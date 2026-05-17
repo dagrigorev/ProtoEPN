@@ -93,6 +93,17 @@ TEST_F(DiscoveryTest, Registry_InvalidSignatureRejected) {
     EXPECT_EQ(reg.size(), 0u);
 }
 
+TEST_F(DiscoveryTest, Registry_NodeIdMustMatchDhPublicKey) {
+    AnnouncementRegistry reg;
+
+    auto ann = make_announcement(NodeRole::Relay, "127.0.0.1", 9001);
+    ann.node_id_hex = std::string(64, '0');
+
+    auto res = reg.upsert(ann);
+    EXPECT_TRUE(res.is_err()) << "Mismatched node_id should be rejected";
+    EXPECT_EQ(reg.size(), 0u);
+}
+
 TEST_F(DiscoveryTest, Registry_ExpiredAnnouncementRejected) {
     AnnouncementRegistry reg;
 

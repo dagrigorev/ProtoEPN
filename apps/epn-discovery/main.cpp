@@ -127,18 +127,16 @@ int main(int argc, char** argv) {
     schedule_sweep();
 
     // Accept loop (each connection handled in a detached thread)
-    auto do_accept = [&]() {
-        std::function<void()> accept_fn = [&]() {
-            acceptor.async_accept([&](std::error_code ec, tcp::socket sock) {
-                if (!ec && g_running) {
-                    std::thread([s = std::move(sock)]() mutable {
-                        handle_connection(std::move(s));
-                    }).detach();
-                }
-                if (g_running) accept_fn();
-            });
-        };
-        accept_fn();
+    std::function<void()> do_accept;
+    do_accept = [&]() {
+        acceptor.async_accept([&](std::error_code ec, tcp::socket sock) {
+            if (!ec && g_running) {
+                std::thread([s = std::move(sock)]() mutable {
+                    handle_connection(std::move(s));
+                }).detach();
+            }
+            if (g_running) do_accept();
+        });
     };
     do_accept();
 

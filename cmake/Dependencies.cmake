@@ -2,15 +2,32 @@ include(FetchContent)
 set(FETCHCONTENT_QUIET ON)
 
 # ─── libsodium (system) ──────────────────────────────────────────────────────
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(SODIUM REQUIRED libsodium)
+if(WIN32)
+  find_package(unofficial-sodium CONFIG QUIET)
+  if(unofficial-sodium_FOUND)
+    add_library(sodium INTERFACE)
+    target_link_libraries(sodium INTERFACE unofficial-sodium::sodium)
+  else()
+    find_path(SODIUM_INCLUDE_DIR sodium.h)
+    find_library(SODIUM_LIB_PATH NAMES sodium libsodium)
+    if(NOT SODIUM_INCLUDE_DIR OR NOT SODIUM_LIB_PATH)
+      message(FATAL_ERROR "libsodium not found. Install it with vcpkg or provide SODIUM_INCLUDE_DIR and SODIUM_LIB_PATH.")
+    endif()
+    add_library(sodium INTERFACE)
+    target_include_directories(sodium INTERFACE ${SODIUM_INCLUDE_DIR})
+    target_link_libraries(sodium INTERFACE ${SODIUM_LIB_PATH})
+  endif()
+else()
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(SODIUM REQUIRED libsodium)
 
-# Use find_library to get the actual .so path — avoids circular target ref
-find_library(SODIUM_LIB_PATH NAMES sodium REQUIRED)
+  # Use find_library to get the actual .so path — avoids circular target ref
+  find_library(SODIUM_LIB_PATH NAMES sodium REQUIRED)
 
-add_library(sodium INTERFACE)
-target_include_directories(sodium INTERFACE ${SODIUM_INCLUDE_DIRS})
-target_link_libraries(sodium INTERFACE ${SODIUM_LIB_PATH})
+  add_library(sodium INTERFACE)
+  target_include_directories(sodium INTERFACE ${SODIUM_INCLUDE_DIRS})
+  target_link_libraries(sodium INTERFACE ${SODIUM_LIB_PATH})
+endif()
 
 # ─── Standalone Asio (header-only) ───────────────────────────────────────────
 FetchContent_Declare(

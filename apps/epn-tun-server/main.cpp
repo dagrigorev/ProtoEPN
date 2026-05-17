@@ -25,6 +25,7 @@
 #include <atomic>
 #include <csignal>
 #include <cstring>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>

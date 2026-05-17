@@ -29,9 +29,11 @@
 #include <sodium.h>
 
 #include <atomic>
+#include <cerrno>
 #include <condition_variable>
 #include <csignal>
 #include <cstring>
+#include <deque>
 #include <functional>
 #include <random>
 #include <memory>
@@ -39,6 +41,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <sys/socket.h>
 
 using namespace epn;
 using namespace epn::core;
@@ -49,6 +52,16 @@ using namespace epn::routing;
 using asio::ip::tcp;
 
 static std::atomic<bool> g_running{true};
+static constexpr int EPN_SOCKET_MARK = 0xEAB5;
+
+static void mark_epn_socket(tcp::socket& sock) {
+    int mark = EPN_SOCKET_MARK;
+    if (setsockopt(sock.native_handle(), SOL_SOCKET, SO_MARK,
+                   &mark, sizeof(mark)) < 0) {
+        LOG_WARN("EpnTunnel: SO_MARK 0x{:x} failed: {}. Transparent mode may loop unless relay/server IPs are excluded.",
+                 EPN_SOCKET_MARK, std::strerror(errno));
+    }
+}
 
 // ─── Async write helpers ──────────────────────────────────────────────────────
 static void async_write_buf(
@@ -142,6 +155,7 @@ public:
                             if (!ec2) {
                                 std::error_code oe;
                                 s->set_option(tcp::no_delay(true), oe);
+                                mark_epn_socket(*s);
                                 epn_sock_ = s;
                             }
                             connect_ec = ec2;
@@ -551,8 +565,8 @@ static void handle_socks5_client(
 // --transparent is passed. The function below replaces the SOCKS5 accept loop.
 
 #include <linux/netfilter_ipv4.h>  // SO_ORIGINAL_DST
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
 static std::pair<std::string, uint16_t>
 get_original_dst(int fd) {
@@ -573,52 +587,49 @@ void run_transparent_proxy(
     const std::string&         bind_addr,
     uint16_t                   tproxy_port)
 {
-    tcp::acceptor acceptor(
+    auto acceptor = std::make_shared<tcp::acceptor>(
         ioc,
         tcp::endpoint(asio::ip::make_address(bind_addr), tproxy_port));
-    acceptor.set_option(asio::socket_base::reuse_address(true));
+    acceptor->set_option(asio::socket_base::reuse_address(true));
 
     LOG_INFO("Transparent proxy: listening on {}:{}", bind_addr, tproxy_port);
     LOG_INFO("All iptables-redirected TCP will be tunneled via EPN");
 
-    auto do_accept = [&acceptor, tunnel, &ioc]() {
-        std::function<void()> accept_fn;
-        accept_fn = [&acceptor, tunnel, &ioc, &accept_fn]() {
-            acceptor.async_accept([&, tunnel](std::error_code ec, tcp::socket sock) {
-                if (ec) return;
-                std::error_code oe;
-                sock.set_option(tcp::no_delay(true), oe);
+    auto accept_fn = std::make_shared<std::function<void()>>();
+    *accept_fn = [acceptor, tunnel, accept_fn]() {
+        acceptor->async_accept([acceptor, tunnel, accept_fn](std::error_code ec, tcp::socket sock) {
+            if (ec) return;
+            std::error_code oe;
+            sock.set_option(tcp::no_delay(true), oe);
 
-                auto client = std::make_shared<tcp::socket>(std::move(sock));
-                int  fd     = static_cast<int>(client->native_handle());
+            auto client = std::make_shared<tcp::socket>(std::move(sock));
+            int  fd     = static_cast<int>(client->native_handle());
 
-                // Recover original destination from iptables REDIRECT
-                auto [host, port] = get_original_dst(fd);
-                if (host.empty() || port == 0) {
-                    LOG_WARN("Transparent: cannot get SO_ORIGINAL_DST");
-                    accept_fn();
+            // Recover original destination from iptables REDIRECT
+            auto [host, port] = get_original_dst(fd);
+            if (host.empty() || port == 0) {
+                LOG_WARN("Transparent: cannot get SO_ORIGINAL_DST");
+                (*accept_fn)();
+                return;
+            }
+
+            LOG_INFO("Transparent: intercepted TCP → {}:{}", host, port);
+
+            std::thread([client, tunnel, host, port]() mutable {
+                uint32_t sid = tunnel->open_stream(host, port, client);
+                if (sid == 0) {
+                    // Send RST to indicate connection failed
+                    std::error_code ec2;
+                    client->shutdown(tcp::socket::shutdown_both, ec2);
                     return;
                 }
+                tunnel->pump_from_local(sid);
+            }).detach();
 
-                LOG_INFO("Transparent: intercepted TCP → {}:{}", host, port);
-
-                std::thread([client, tunnel, host, port, &ioc]() mutable {
-                    uint32_t sid = tunnel->open_stream(host, port, client);
-                    if (sid == 0) {
-                        // Send RST to indicate connection failed
-                        std::error_code ec2;
-                        client->shutdown(tcp::socket::shutdown_both, ec2);
-                        return;
-                    }
-                    tunnel->pump_from_local(sid);
-                }).detach();
-
-                accept_fn();
-            });
-        };
-        accept_fn();
+            (*accept_fn)();
+        });
     };
-    do_accept();
+    (*accept_fn)();
 }
 
 // ─── main ─────────────────────────────────────────────────────────────────────

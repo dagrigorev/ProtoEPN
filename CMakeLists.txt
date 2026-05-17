@@ -34,12 +34,12 @@ add_subdirectory(apps/epn-relay)
 add_subdirectory(apps/epn-server)
 add_subdirectory(apps/epn-client)
 add_subdirectory(apps/epn-tun-server)
-add_subdirectory(apps/epn-tun-client)
-add_subdirectory(apps/epn-tun-dev)
 
-# Windows cross-compiled client
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+if(WIN32)
   add_subdirectory(apps/epn-win-client)
+else()
+  add_subdirectory(apps/epn-tun-client)
+  add_subdirectory(apps/epn-tun-dev)
 endif()
 
 # Tests

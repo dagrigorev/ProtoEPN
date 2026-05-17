@@ -53,6 +53,12 @@ Result<NodeAnnouncement> NodeAnnouncement::from_json(const json& j) {
 
 // ─── Verify signature ─────────────────────────────────────────────────────────
 Result<void> NodeAnnouncement::verify_signature() const {
+    NodeId expected_node_id = crypto::pubkey_to_node_id(dh_pubkey);
+    std::string expected_hex = to_hex({expected_node_id.data.data(), expected_node_id.data.size()});
+    if (node_id_hex != expected_hex) {
+        return Result<void>::err("node_id does not match dh_pubkey");
+    }
+
     auto payload = crypto::make_announcement_signing_payload(
         role, dh_pubkey, sign_pubkey, timestamp, ttl, addr, port
     );
