@@ -12,6 +12,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR/.."
 BUILD_DIR="$ROOT/build-windows"
+DEPS_DIR="$ROOT/.deps/windows"
+SODIUM_PREFIX="$DEPS_DIR/x86_64-w64-mingw32"
 SODIUM_VERSION="${SODIUM_VERSION:-1.0.20}"
 
 GREEN='\033[0;32m'; CYAN='\033[0;36m'; RED='\033[0;31m'; NC='\033[0m'
@@ -27,13 +29,16 @@ check_tool() {
 }
 check_tool x86_64-w64-mingw32-g++-posix
 check_tool x86_64-w64-mingw32-windres
+check_tool curl
+check_tool tar
 echo -e "Compiler: $(x86_64-w64-mingw32-g++-posix --version | head -1)"
 
 # ── Build libsodium for Windows if not present ────────────────────────────────
-SODIUM_WIN="/usr/x86_64-w64-mingw32/lib/libsodium.a"
+SODIUM_WIN="$SODIUM_PREFIX/lib/libsodium.a"
 if [[ ! -f "$SODIUM_WIN" ]]; then
     echo ""
     echo "Building libsodium $SODIUM_VERSION for Windows/MinGW..."
+    mkdir -p "$SODIUM_PREFIX"
     SODIUM_SRC="/tmp/libsodium-$SODIUM_VERSION"
     SODIUM_TARBALL="/tmp/libsodium-$SODIUM_VERSION.tar.gz"
     if [[ ! -d "$SODIUM_SRC" ]]; then
@@ -46,7 +51,7 @@ if [[ ! -f "$SODIUM_WIN" ]]; then
     [[ ! -f configure ]] && autoreconf -fi
     ./configure \
         --host=x86_64-w64-mingw32 \
-        --prefix=/usr/x86_64-w64-mingw32 \
+        --prefix="$SODIUM_PREFIX" \
         --disable-shared --enable-static \
         CFLAGS="-O2" -q
     make -j"$(nproc)" -s
@@ -69,6 +74,8 @@ cmake "$ROOT" \
     -DCMAKE_BUILD_TYPE=Release \
     -DEPN_BUILD_TESTS=OFF \
     -DEPN_ENABLE_PQ_CRYPTO=OFF \
+    -DSODIUM_INCLUDE_DIR="$SODIUM_PREFIX/include" \
+    -DSODIUM_LIB_PATH="$SODIUM_WIN" \
     2>&1 | tail -8
 
 echo ""

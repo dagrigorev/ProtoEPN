@@ -55,23 +55,7 @@ if(WIN32)
 endif()
 
 # ─── libsodium ────────────────────────────────────────────────────────────────
-if(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    # Use cross-compiled libsodium for Windows/MinGW
-    find_library(SODIUM_WIN_LIB
-        NAMES sodium
-        PATHS /usr/x86_64-w64-mingw32/lib
-        NO_DEFAULT_PATH
-    )
-    if(SODIUM_WIN_LIB)
-        target_link_libraries(epn-win-client PRIVATE ${SODIUM_WIN_LIB})
-        target_include_directories(epn-win-client PRIVATE /usr/x86_64-w64-mingw32/include)
-    else()
-        message(FATAL_ERROR "libsodium for Windows/MinGW not found at /usr/x86_64-w64-mingw32/lib")
-    endif()
-else()
-    # Native Windows build — use system libsodium or vcpkg
-    target_link_libraries(epn-win-client PRIVATE sodium)
-endif()
+target_link_libraries(epn-win-client PRIVATE sodium)
 
 # ─── Static linking for Windows (single .exe, no DLL dependencies) ────────────
 if(MINGW OR CMAKE_CROSSCOMPILING)

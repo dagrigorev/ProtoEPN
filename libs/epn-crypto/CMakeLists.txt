@@ -13,7 +13,7 @@ target_include_directories(epn-crypto
 
 target_link_libraries(epn-crypto
     PUBLIC  epn-core
-    PRIVATE sodium
+            sodium
 )
 
 target_compile_features(epn-crypto PUBLIC cxx_std_20)

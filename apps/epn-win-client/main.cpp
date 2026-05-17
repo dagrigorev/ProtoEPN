@@ -401,7 +401,7 @@ socks5_handshake(std::shared_ptr<tcp::socket> sock) {
 }
 
 static void socks5_reply(std::shared_ptr<tcp::socket> sock, bool ok) {
-    uint8_t rep[10]={0x05, ok?0x00u:0x05u, 0x00, 0x01,0,0,0,0,0,0};
+    uint8_t rep[10]={0x05, static_cast<uint8_t>(ok ? 0x00u : 0x05u), 0x00, 0x01,0,0,0,0,0,0};
     std::error_code ec; asio::write(*sock,asio::buffer(rep),ec);
 }
 
