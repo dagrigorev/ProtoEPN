@@ -65,7 +65,11 @@ public partial class MainWindow : Window
         {
             var endpoint = EndpointParser.Parse(EndpointBox.Text);
             var socksPort = ParsePort(SocksPortBox.Text, "SOCKS port");
+#if DEBUG
+            var timeout = TimeSpan.FromMinutes(10);
+#else
             var timeout = ParseTimeout(TimeoutBox.Text);
+#endif
 
             SaveSettings();
             SetConnecting($"Discovering {endpoint.Host}:{endpoint.Port}...");

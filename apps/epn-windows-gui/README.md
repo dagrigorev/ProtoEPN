@@ -6,7 +6,7 @@ Minimal WPF shell for `epn-win-client.exe`.
 
 1. Put `epn-windows-gui.exe` and `epn-win-client.exe` in the same directory.
 2. Start `epn-windows-gui.exe`.
-3. Enter an endpoint URL, for example `epn://139.60.163.250:8000`.
+3. Enter an endpoint URL, for example `epn://127.0.0.1:8000`.
 4. Click **Connect**.
 
 The GUI starts `epn-win-client.exe socks`, waits until the tunnel is ready, and
