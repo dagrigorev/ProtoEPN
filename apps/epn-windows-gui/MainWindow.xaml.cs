@@ -197,7 +197,7 @@ public partial class MainWindow : Window
         }
         else if (line.Contains("tunnel established", StringComparison.OrdinalIgnoreCase))
         {
-            SetConnected("Tunnel established.");
+            SetConnecting("Tunnel established. Starting local SOCKS proxy...");
         }
         else if (line.Contains("Stopped. Goodbye", StringComparison.OrdinalIgnoreCase))
         {

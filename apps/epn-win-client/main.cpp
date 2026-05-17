@@ -728,10 +728,10 @@ int main(int argc, char** argv) {
     // ─────────────────────────────────────────────────────────────────────────
     if (app.got_subcommand("socks")) {
         // SOCKS5 only
-        tcp::acceptor acceptor(ioc,
+        auto acceptor = std::make_shared<tcp::acceptor>(ioc,
             tcp::endpoint(asio::ip::make_address("127.0.0.1"),
                           static_cast<uint16_t>(socks_port)));
-        acceptor.set_option(asio::socket_base::reuse_address(true));
+        acceptor->set_option(asio::socket_base::reuse_address(true));
 
         {
             win_con::Colored c(win_con::GREEN);
@@ -744,25 +744,26 @@ int main(int argc, char** argv) {
         std::cout << "  Git:     git config --global http.proxy socks5://127.0.0.1:" << socks_port << "\n\n";
         std::cout << "Press Ctrl+C to stop.\n\n";
 
-        std::function<void()> do_accept = [&]() {
-            acceptor.async_accept([&](std::error_code ec, tcp::socket sock) {
+        auto do_accept = std::make_shared<std::function<void()>>();
+        *do_accept = [acceptor, tunnel, do_accept]() {
+            acceptor->async_accept([acceptor, tunnel, do_accept](std::error_code ec, tcp::socket sock) {
                 if (ec) return;
                 std::error_code oe; sock.set_option(tcp::no_delay(true), oe);
                 auto client = std::make_shared<tcp::socket>(std::move(sock));
                 std::thread([client, tunnel]() mutable {
                     handle_socks5_client(client, tunnel);
                 }).detach();
-                do_accept();
+                (*do_accept)();
             });
         };
-        do_accept();
+        (*do_accept)();
 
     } else if (app.got_subcommand("sysproxy")) {
         // SOCKS5 + set Windows system proxy
-        tcp::acceptor acceptor(ioc,
+        auto acceptor = std::make_shared<tcp::acceptor>(ioc,
             tcp::endpoint(asio::ip::make_address("127.0.0.1"),
                           static_cast<uint16_t>(socks_port)));
-        acceptor.set_option(asio::socket_base::reuse_address(true));
+        acceptor->set_option(asio::socket_base::reuse_address(true));
 
         // Set system proxy
         if (win_proxy::enable("127.0.0.1", static_cast<uint16_t>(socks_port))) {
@@ -779,18 +780,19 @@ int main(int argc, char** argv) {
         std::cout << "Bypass: localhost, 127.*, 10.*, 172.16-31.*, 192.168.*\n\n";
         std::cout << "Press Ctrl+C to stop.\n\n";
 
-        std::function<void()> do_accept = [&]() {
-            acceptor.async_accept([&](std::error_code ec, tcp::socket sock) {
+        auto do_accept = std::make_shared<std::function<void()>>();
+        *do_accept = [acceptor, tunnel, do_accept]() {
+            acceptor->async_accept([acceptor, tunnel, do_accept](std::error_code ec, tcp::socket sock) {
                 if (ec) return;
                 std::error_code oe; sock.set_option(tcp::no_delay(true), oe);
                 auto client = std::make_shared<tcp::socket>(std::move(sock));
                 std::thread([client, tunnel]() mutable {
                     handle_socks5_client(client, tunnel);
                 }).detach();
-                do_accept();
+                (*do_accept)();
             });
         };
-        do_accept();
+        (*do_accept)();
 
         // Cleanup: remove system proxy on exit
         win_ctrl::g_shutdown_fn = [&, orig_fn = win_ctrl::g_shutdown_fn]() {
