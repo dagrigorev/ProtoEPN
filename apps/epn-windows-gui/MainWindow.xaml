@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="EPN Client"
         Width="460"
-        Height="365"
+        Height="380"
         MinWidth="420"
         MinHeight="310"
         WindowStartupLocation="CenterScreen"
@@ -78,7 +78,7 @@
                 <Ellipse x:Name="StatusDot" Width="14" Height="14" Fill="#94A3B8" VerticalAlignment="Center"/>
                 <StackPanel Grid.Column="2">
                     <TextBlock x:Name="StatusText" Text="Disconnected" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="DetailsText" Text="Enter an endpoint and connect." Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="DetailsText" Text="Enter an endpoint and connect." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Height="35"/>
                 </StackPanel>
             </Grid>
         </Border>

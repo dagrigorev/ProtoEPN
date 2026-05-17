@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Net.Sockets;
 
 namespace Epn.WindowsGui.Services;
 
@@ -18,8 +19,11 @@ public sealed class EpnClientProcess
         }
 
         var exe = ResolveClientExe();
-        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var readyFromLog = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var failed = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        OutputReceived?.Invoke($"[GUI] Launching: {exe}");
 
         process = new Process
         {
@@ -29,6 +33,7 @@ public sealed class EpnClientProcess
                 Arguments = $"socks --disc-host {Quote(host)} --disc-port {discoveryPort} --socks-port {socksPort} --debug",
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 WorkingDirectory = Path.GetDirectoryName(exe)!
@@ -36,15 +41,19 @@ public sealed class EpnClientProcess
             EnableRaisingEvents = true
         };
 
-        process.OutputDataReceived += (_, e) => HandleLine(e.Data, ready, failed);
-        process.ErrorDataReceived += (_, e) => HandleLine(e.Data, ready, failed);
+        process.OutputDataReceived += (_, e) => HandleLine(e.Data, readyFromLog, failed);
+        process.ErrorDataReceived += (_, e) => HandleLine(e.Data, readyFromLog, failed);
+
         process.Exited += (_, _) =>
         {
-            if (!ready.Task.IsCompleted)
+            var exitCode = process.ExitCode;
+
+            if (!readyFromLog.Task.IsCompleted)
             {
-                failed.TrySetResult($"EPN client exited with code {process.ExitCode}.");
+                failed.TrySetResult($"EPN client exited before SOCKS was ready. Exit code: {exitCode}.");
             }
-            Exited?.Invoke(process.ExitCode);
+
+            Exited?.Invoke(exitCode);
         };
 
         if (!process.Start())
@@ -55,15 +64,25 @@ public sealed class EpnClientProcess
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        await using var reg = cancellationToken.Register(() => failed.TrySetCanceled(cancellationToken));
-        var completed = await Task.WhenAny(ready.Task, failed.Task);
-        await completed;
+        await using var reg = cancellationToken.Register(() =>
+        {
+            failed.TrySetCanceled(cancellationToken);
+        });
+
+        var readyFromPort = WaitForTcpPortAsync("127.0.0.1", socksPort, cancellationToken);
+
+        var completed = await Task.WhenAny(
+            readyFromLog.Task,
+            readyFromPort,
+            failed.Task);
 
         if (completed == failed.Task)
         {
             await StopAsync();
             throw new InvalidOperationException(await failed.Task);
         }
+
+        await completed;
     }
 
     public async Task StopAsync()
@@ -92,7 +111,43 @@ public sealed class EpnClientProcess
         }
     }
 
-    private void HandleLine(string? line, TaskCompletionSource ready, TaskCompletionSource<string> failed)
+    private static async Task WaitForTcpPortAsync(string host, int port, CancellationToken cancellationToken)
+    {
+        Exception? lastError = null;
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                using var tcp = new TcpClient();
+
+                var connectTask = tcp.ConnectAsync(host, port, cancellationToken).AsTask();
+                var timeoutTask = Task.Delay(5000, cancellationToken);
+
+                var completed = await Task.WhenAny(connectTask, timeoutTask);
+
+                if (completed == connectTask && tcp.Connected)
+                {
+                    return;
+                }
+            }
+            catch (Exception ex) when (ex is SocketException or IOException or OperationCanceledException)
+            {
+                lastError = ex;
+            }
+
+            await Task.Delay(200, cancellationToken);
+        }
+
+        throw new OperationCanceledException(
+            $"SOCKS port {host}:{port} did not become ready. Last error: {lastError?.Message}",
+            cancellationToken);
+    }
+
+    private void HandleLine(
+    string? line,
+    TaskCompletionSource ready,
+    TaskCompletionSource<string> failed)
     {
         if (string.IsNullOrWhiteSpace(line))
         {
@@ -101,12 +156,36 @@ public sealed class EpnClientProcess
 
         OutputReceived?.Invoke(line);
 
-        if (line.Contains("SOCKS5 proxy running", StringComparison.OrdinalIgnoreCase))
+        if (line.Contains("SOCKS5 proxy running", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("EpnTunnel: established", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Tunnel: established", StringComparison.OrdinalIgnoreCase))
         {
             ready.TrySetResult();
+            return;
         }
-        else if (line.Contains("[FAIL]", StringComparison.OrdinalIgnoreCase) ||
-                 line.Contains("Cannot establish", StringComparison.OrdinalIgnoreCase))
+
+        if (line.Contains("[FAIL]", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Cannot establish", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("error", StringComparison.OrdinalIgnoreCase))
+        {
+            failed.TrySetResult(line);
+        }
+    }
+
+    private void HandleLine(string? line, TaskCompletionSource<string> failed)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return;
+        }
+
+        OutputReceived?.Invoke(line);
+
+        if (line.Contains("[FAIL]", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Cannot establish", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("error", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("failed", StringComparison.OrdinalIgnoreCase))
         {
             failed.TrySetResult(line);
         }

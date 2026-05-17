@@ -65,11 +65,7 @@ public partial class MainWindow : Window
         {
             var endpoint = EndpointParser.Parse(EndpointBox.Text);
             var socksPort = ParsePort(SocksPortBox.Text, "SOCKS port");
-#if DEBUG
-            var timeout = TimeSpan.FromMinutes(10);
-#else
             var timeout = ParseTimeout(TimeoutBox.Text);
-#endif
 
             SaveSettings();
             SetConnecting($"Discovering {endpoint.Host}:{endpoint.Port}...");
@@ -122,13 +118,23 @@ public partial class MainWindow : Window
 
     private void ObserveClientOutput(string line)
     {
-        if (line.Contains("route built", StringComparison.OrdinalIgnoreCase))
+        DetailsText.Text = line;
+
+        if (line.Contains("SOCKS5 proxy running", StringComparison.OrdinalIgnoreCase))
+        {
+            SetConnected("SOCKS5 proxy is running.");
+        }
+        else if (line.Contains("route built", StringComparison.OrdinalIgnoreCase))
         {
             DetailsText.Text = line;
         }
         else if (line.Contains("tunnel established", StringComparison.OrdinalIgnoreCase))
         {
             SetConnected("Tunnel established.");
+        }
+        else if (line.Contains("Stopped. Goodbye", StringComparison.OrdinalIgnoreCase))
+        {
+            SetDisconnected("EPN client stopped.");
         }
         else if (line.Contains("Cannot establish", StringComparison.OrdinalIgnoreCase) ||
                  line.Contains("[FAIL]", StringComparison.OrdinalIgnoreCase))
