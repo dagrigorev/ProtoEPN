@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="EPN Client"
         Width="460"
-        Height="380"
+        Height="412"
         MinWidth="420"
         MinHeight="310"
         WindowStartupLocation="CenterScreen"

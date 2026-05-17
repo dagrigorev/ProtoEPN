@@ -13,6 +13,10 @@ public partial class MainWindow : Window
     private readonly Forms.NotifyIcon trayIcon;
     private bool exitRequested;
 
+    private CancellationTokenSource? connectCts;
+    private int connectionGeneration;
+    private bool disconnectInProgress;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -61,6 +65,12 @@ public partial class MainWindow : Window
 
     private async Task ConnectAsync()
     {
+        var generation = ++connectionGeneration;
+
+        connectCts?.Cancel();
+        connectCts?.Dispose();
+        connectCts = null;
+
         try
         {
             var endpoint = EndpointParser.Parse(EndpointBox.Text);
@@ -70,9 +80,23 @@ public partial class MainWindow : Window
             SaveSettings();
             SetConnecting($"Discovering {endpoint.Host}:{endpoint.Port}...");
 
-            using var cts = new CancellationTokenSource(timeout);
-            await client.StartAsync(endpoint.Host, endpoint.Port, socksPort, cts.Token);
+            connectCts = new CancellationTokenSource(timeout);
+            var token = connectCts.Token;
+
+            await client.StartAsync(endpoint.Host, endpoint.Port, socksPort, token);
+
+            if (token.IsCancellationRequested || generation != connectionGeneration)
+            {
+                return;
+            }
+
             SystemProxy.EnableSocks("127.0.0.1", socksPort);
+
+            if (token.IsCancellationRequested || generation != connectionGeneration)
+            {
+                SystemProxy.Disable();
+                return;
+            }
 
             SetConnected($"System proxy: socks=127.0.0.1:{socksPort}");
             trayIcon.Text = "EPN connected";
@@ -80,22 +104,49 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException)
         {
-            await DisconnectAsync();
-            SetDisconnected("Connection timeout.");
+            if (generation == connectionGeneration && !disconnectInProgress)
+            {
+                await DisconnectAsync();
+                SetDisconnected("Connection timeout.");
+            }
         }
         catch (Exception ex)
         {
-            await DisconnectAsync();
-            SetDisconnected(ex.Message);
+            if (generation == connectionGeneration && !disconnectInProgress)
+            {
+                await DisconnectAsync();
+                SetDisconnected(ex.Message);
+            }
         }
     }
 
     private async Task DisconnectAsync()
     {
-        SystemProxy.Disable();
-        await client.StopAsync();
-        SetDisconnected("Proxy disabled.");
-        trayIcon.Text = "EPN disconnected";
+        if (disconnectInProgress)
+        {
+            return;
+        }
+
+        disconnectInProgress = true;
+
+        try
+        {
+            connectionGeneration++;
+
+            connectCts?.Cancel();
+
+            SystemProxy.Disable();
+            await client.StopAsync();
+
+            SetDisconnected("Proxy disabled.");
+            trayIcon.Text = "EPN disconnected";
+        }
+        finally
+        {
+            connectCts?.Dispose();
+            connectCts = null;
+            disconnectInProgress = false;
+        }
     }
 
     private static int ParsePort(string value, string name)
@@ -119,6 +170,11 @@ public partial class MainWindow : Window
     private void ObserveClientOutput(string line)
     {
         DetailsText.Text = line;
+
+        if (disconnectInProgress)
+        {
+            return;
+        }
 
         if (line.Contains("SOCKS5 proxy running", StringComparison.OrdinalIgnoreCase))
         {
@@ -145,11 +201,15 @@ public partial class MainWindow : Window
 
     private void OnClientExited(int code)
     {
-        if (!exitRequested && code != 0)
+        if (exitRequested || disconnectInProgress)
         {
-            SystemProxy.Disable();
-            SetDisconnected($"EPN process exited with code {code}.");
+            return;
         }
+
+        SystemProxy.Disable();
+        SetDisconnected(code == 0
+            ? "EPN process stopped."
+            : $"EPN process exited with code {code}.");
     }
 
     private void SetConnecting(string details)

@@ -46,7 +46,22 @@ public sealed class EpnClientProcess
 
         process.Exited += (_, _) =>
         {
-            var exitCode = process.ExitCode;
+            var currentProcess = process;
+            if (currentProcess is null)
+            {
+                return;
+            }
+
+            int exitCode;
+
+            try
+            {
+                exitCode = currentProcess.ExitCode;
+            }
+            catch
+            {
+                exitCode = -1;
+            }
 
             if (!readyFromLog.Task.IsCompleted)
             {
@@ -87,27 +102,50 @@ public sealed class EpnClientProcess
 
     public async Task StopAsync()
     {
-        if (process is null)
+        var currentProcess = process;
+        if (currentProcess is null)
         {
             return;
         }
 
+        process = null;
+
         try
         {
-            if (!process.HasExited)
+            if (!currentProcess.HasExited)
             {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync();
+                try
+                {
+                    currentProcess.StandardInput.Close();
+                }
+                catch
+                {
+                    // ignored
+                }
+
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+                try
+                {
+                    await currentProcess.WaitForExitAsync(timeoutCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    if (!currentProcess.HasExited)
+                    {
+                        currentProcess.Kill(entireProcessTree: true);
+                        await currentProcess.WaitForExitAsync();
+                    }
+                }
             }
         }
         catch
         {
-            // The process may have exited between HasExited and Kill.
+            // The process may have exited between checks.
         }
         finally
         {
-            process.Dispose();
-            process = null;
+            currentProcess.Dispose();
         }
     }
 
@@ -172,25 +210,6 @@ public sealed class EpnClientProcess
             failed.TrySetResult(line);
         }
     }
-
-    private void HandleLine(string? line, TaskCompletionSource<string> failed)
-    {
-        if (string.IsNullOrWhiteSpace(line))
-        {
-            return;
-        }
-
-        OutputReceived?.Invoke(line);
-
-        if (line.Contains("[FAIL]", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Cannot establish", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("error", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("failed", StringComparison.OrdinalIgnoreCase))
-        {
-            failed.TrySetResult(line);
-        }
-    }
-
     private static string ResolveClientExe()
     {
         var baseDir = AppContext.BaseDirectory;
