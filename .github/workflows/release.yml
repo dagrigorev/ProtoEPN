@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  linux:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is on main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ pkg-config libsodium-dev
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DEPN_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Package Linux server
+        run: |
+          set -eux
+          mkdir -p dist/epn-linux-x86_64/bin dist/epn-linux-x86_64/scripts
+          cp build/apps/epn-discovery/epn-discovery dist/epn-linux-x86_64/bin/
+          cp build/apps/epn-relay/epn-relay dist/epn-linux-x86_64/bin/
+          cp build/apps/epn-server/epn-server dist/epn-linux-x86_64/bin/
+          cp build/apps/epn-client/epn-client dist/epn-linux-x86_64/bin/
+          cp build/apps/epn-tun-server/epn-tun-server dist/epn-linux-x86_64/bin/
+          cp build/apps/epn-tun-client/epn-tun-client dist/epn-linux-x86_64/bin/
+          cp build/apps/epn-tun-dev/epn-tun-dev dist/epn-linux-x86_64/bin/
+          cp scripts/install-server.sh dist/epn-linux-x86_64/scripts/
+          cp scripts/epn-start.sh scripts/epn-setup.sh scripts/epn-teardown.sh dist/epn-linux-x86_64/scripts/
+          cp README.md dist/epn-linux-x86_64/
+          tar -C dist -czf epn-linux-x86_64-${{ github.ref_name }}.tar.gz epn-linux-x86_64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: epn-linux-x86_64
+          path: epn-linux-x86_64-${{ github.ref_name }}.tar.gz
+
+  windows-client:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is on main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
+
+      - name: Install cross compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake make git autoconf automake libtool pkg-config mingw-w64 zip
+
+      - name: Build Windows client
+        run: scripts/build-windows.sh
+
+      - name: Package Windows client
+        run: |
+          set -eux
+          mkdir -p dist/epn-windows-x86_64
+          cp build-windows/apps/epn-win-client/epn-win-client.exe dist/epn-windows-x86_64/
+          cp apps/epn-win-client/README-WINDOWS.md dist/epn-windows-x86_64/
+          cd dist
+          zip -r ../epn-windows-x86_64-${{ github.ref_name }}.zip epn-windows-x86_64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: epn-windows-x86_64
+          path: epn-windows-x86_64-${{ github.ref_name }}.zip
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: [linux, windows-client]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: EPN ${{ github.ref_name }}
+          generate_release_notes: true
+          files: release-assets/*

@@ -66,6 +66,40 @@ cmake .. -DEPN_ENABLE_PQ_CRYPTO=ON   # requires liboqs
 
 ---
 
+## VPS Install
+
+On a fresh Linux VPS, install and start discovery, three relays, and the tunnel
+exit node with:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dagrigorev/ProtoEPN/main/scripts/install-server.sh | sudo bash
+```
+
+The installer prints the public discovery endpoint and ready-to-run client
+commands. To install a specific release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dagrigorev/ProtoEPN/main/scripts/install-server.sh \
+  | sudo env EPN_VERSION=v0.1.0 bash
+```
+
+Create a release by pushing a tag matching `v*` to `main`, for example:
+
+```bash
+git tag v0.1.0
+git push origin main v0.1.0
+```
+
+GitHub Actions publishes Linux server binaries and the Windows client archive.
+
+Windows users can install the released client with PowerShell:
+
+```powershell
+iwr https://raw.githubusercontent.com/dagrigorev/ProtoEPN/main/scripts/install-windows-client.ps1 -UseB | iex
+```
+
+---
+
 ## Usage — Mode 1: SOCKS5 Proxy (no root required)
 
 ```bash

@@ -12,6 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR/.."
 BUILD_DIR="$ROOT/build-windows"
+SODIUM_VERSION="${SODIUM_VERSION:-1.0.20}"
 
 GREEN='\033[0;32m'; CYAN='\033[0;36m'; RED='\033[0;31m'; NC='\033[0m'
 
@@ -32,13 +33,17 @@ echo -e "Compiler: $(x86_64-w64-mingw32-g++-posix --version | head -1)"
 SODIUM_WIN="/usr/x86_64-w64-mingw32/lib/libsodium.a"
 if [[ ! -f "$SODIUM_WIN" ]]; then
     echo ""
-    echo "Building libsodium for Windows/MinGW..."
-    SODIUM_SRC="/tmp/libsodium-src"
+    echo "Building libsodium $SODIUM_VERSION for Windows/MinGW..."
+    SODIUM_SRC="/tmp/libsodium-$SODIUM_VERSION"
+    SODIUM_TARBALL="/tmp/libsodium-$SODIUM_VERSION.tar.gz"
     if [[ ! -d "$SODIUM_SRC" ]]; then
-        git clone --depth=1 -q https://github.com/jedisct1/libsodium.git "$SODIUM_SRC"
+        curl -fL --retry 5 --retry-delay 3 \
+            "https://download.libsodium.org/libsodium/releases/libsodium-$SODIUM_VERSION.tar.gz" \
+            -o "$SODIUM_TARBALL"
+        tar -xzf "$SODIUM_TARBALL" -C /tmp
     fi
     cd "$SODIUM_SRC"
-    [[ ! -f configure ]] && autoreconf -fi -q
+    [[ ! -f configure ]] && autoreconf -fi
     ./configure \
         --host=x86_64-w64-mingw32 \
         --prefix=/usr/x86_64-w64-mingw32 \
@@ -55,6 +60,7 @@ fi
 # ── Run CMake for Windows ──────────────────────────────────────────────────────
 echo ""
 echo "Configuring CMake for Windows (MinGW cross-compilation)..."
+rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 

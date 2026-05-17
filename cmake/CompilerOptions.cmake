@@ -7,6 +7,15 @@ function(epn_set_compiler_options target)
       $<$<CONFIG:Release>:/O2 /DNDEBUG>
       $<$<CONFIG:RelWithDebInfo>:/O2 /Zi /DNDEBUG>
     )
+  elseif(MINGW)
+    target_compile_options(${target} PRIVATE
+      -Wall -Wextra -Wpedantic
+      -Wno-unused-parameter
+      -Wconversion -Wshadow
+      $<$<CONFIG:Debug>:-g -O0 -DEPN_DEBUG>
+      $<$<CONFIG:Release>:-O3 -DNDEBUG>
+      $<$<CONFIG:RelWithDebInfo>:-O2 -g -DNDEBUG>
+    )
   else()
     target_compile_options(${target} PRIVATE
       -Wall -Wextra -Wpedantic
